@@ -1,0 +1,4 @@
+# Dranimate FAST
+
+### Requirements
+- Rust 
