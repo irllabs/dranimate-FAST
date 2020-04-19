@@ -1,0 +1,12 @@
+{
+  "name": "dranimate-fast",
+  "version": "0.1.0",
+  "description": "Dranimate FAST Skinning Library",
+  "main": "index.js",
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "https://batchku@dev.azure.com/batchku/Dranimate/_git/Dranimate-FAST"
+  },
+  "author": "IRL Labs"
+}
