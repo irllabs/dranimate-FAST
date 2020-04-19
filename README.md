@@ -4,7 +4,7 @@ Leverages this [libigl implementation](https://github.com/libigl/libigl/blob/mas
 
 ### Prerequisites 
 
-[CMake](https://cmake.org/) (use "cmake --version" to check existing install)
+[CMake](https://cmake.org/) (use "cmake --version" to check existing install)  
 [Emscripten](https://emscripten.org/index.html) (use "emcc" to check existing install)
 
 ### Install
