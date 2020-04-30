@@ -34,6 +34,8 @@ public:
     Eigen::MatrixXi faces = 
       Eigen::Map<Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(vecFaces.data(), vecFaces.size()/3,3);
 
+    std::cout << "Faces converted" << std::endl;
+
     // Convert handles from js 
     std::vector<double> vecHandles = emscripten::vecFromJSArray<double>(jsHandles);
     Eigen::MatrixXd handles = 
