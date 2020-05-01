@@ -3,10 +3,12 @@
 #include <emscripten.h>
 #include <emscripten/bind.h>
 #include <Eigen/Core> 
+#include <Eigen/SparseCore> 
 #include <igl/cat.h>
 #include <igl/bbw.h>
 #include <igl/arap_dof.h>
 #include <igl/lbs_matrix.h>
+#include <igl/mat_max.h>
 #include <igl/partition.h>
 #include <igl/exterior_edges.h>
 #include <igl/boundary_conditions.h>
@@ -26,15 +28,13 @@ public:
     int dims) {
     // Convert vertices from js
     std::vector<double> vecVertices = emscripten::vecFromJSArray<double>(jsVertices);
-    Eigen::MatrixXd vertices = 
+    m_vertices = 
       Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(vecVertices.data(), vecVertices.size()/dims, dims);
 
     // Convert faces from js
     std::vector<int> vecFaces = emscripten::vecFromJSArray<int>(jsFaces);
     Eigen::MatrixXi faces = 
       Eigen::Map<Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(vecFaces.data(), vecFaces.size()/3,3);
-
-    std::cout << "Faces converted" << std::endl;
 
     // Convert handles from js 
     std::vector<double> vecHandles = emscripten::vecFromJSArray<double>(jsHandles);
@@ -43,15 +43,15 @@ public:
 
     // If 2D convert to 3D
     if(dims == 2) {
-      // Increase vertex dimenstions 
-      vertices.conservativeResize(vertices.rows(), 3);
-      vertices.col(2).setZero(); 
-      // Increase handle dimenstions
+      // Increase vertex dimensions 
+      m_vertices.conservativeResize(m_vertices.rows(), 3);
+      m_vertices.col(2).setZero(); 
+      // Increase handle dimensions
       handles.conservativeResize(handles.rows(), 3);
       handles.col(2).setZero(); 
     }
 
-    std::cout << "Vertices " << vertices.rows() << " [" << vertices << "]" << std::endl;
+    std::cout << "Vertices " << m_vertices.rows() << " [" << m_vertices << "]" << std::endl;
     std::cout << "Faces " << faces.rows() << " [" << faces << "]" << std::endl;
     std::cout << "Handles " << handles.rows() << " [" << handles << "]" << std::endl;
 
@@ -61,10 +61,11 @@ public:
     for (int i = 0; i < handles.rows(); i++) pointHandleIndicies(i) = i;
     std::cout << "Point Handle Indicies [" << pointHandleIndicies << "]" << std::endl;
 
+    // Compute boundary conditions for weight generation
     Eigen::VectorXi boundaryIndicies;
     Eigen::MatrixXd boundaryConditions;
     igl::boundary_conditions(
-      vertices, 
+      m_vertices, 
       faces, 
       handles, 
       pointHandleIndicies, 
@@ -75,11 +76,12 @@ public:
     std::cout << "Generated Boundary Indicies [" << boundaryIndicies << "]" << std::endl;
     std::cout << "Generated Boundary Conditions [" << boundaryConditions << "]" << std::endl;
 
+    // Compute weights
     igl::BBWData bbw_data;
     bbw_data.active_set_params.max_iter = 16;
     bbw_data.verbosity = 2;
     igl::bbw(
-      vertices, 
+      m_vertices, 
       faces, 
       boundaryIndicies, 
       boundaryConditions, 
@@ -88,28 +90,39 @@ public:
     bbw_data.print();
     std::cout << "Generated Weights [" << m_weights << "]" << std::endl;
 
-    // Vertex Groups
-    //Eigen::Matrix<int,Eigen::Dynamic,1> groups;
-    // Return data
-    igl::ArapDOFData<LbsMatrixType,float> arap_dof;
+    // Convert weights into FAST precompute format
+    Eigen::MatrixXd weightsByHandle;
+    igl::lbs_matrix_column(m_vertices, m_weights, weightsByHandle);
 
-    // Convert Weights
-    Eigen::MatrixXd M;
-    igl::lbs_matrix_column(vertices, m_weights, M);
     // Create groups
     Eigen::VectorXi groups;
     {
       Eigen::VectorXi S;
       Eigen::VectorXd D;
-      igl::partition(m_weights,50,groups,S,D); 
+      igl::partition(m_weights, 50, groups, S, D);
     }
-    igl::arap_dof_precomputation(vertices,faces,M,groups,m_arap_dof_data);
-  }
-  void recompute(void) {
+
+    // Find indicies of handle vertices
+    {
+      Eigen::VectorXd maxWeight;
+      igl::mat_max(m_weights, 1, maxWeight, m_handleIndicies);
+    }
+
+    // FAST precompute
+    igl::arap_dof_precomputation(
+      m_vertices,
+      faces,
+      weightsByHandle,
+      groups,
+      m_arap_dof_data);
+
+    // FAST initial recompute
+    recompute();
   }
   void update(void) {
   }
   emscripten::val getWeights() {
+    // Return flat array of computed weights
     std::vector<double> flatWeights;
     for(int r=0; r<m_weights.rows(); r++) {
       for(int c=0; c<m_weights.cols(); c++) {
@@ -119,6 +132,25 @@ public:
     return emscripten::val(emscripten::typed_memory_view(flatWeights.size(), flatWeights.data()));
   }
 private:
+  void computeWeights(Eigen::MatrixXd m_vertices, Eigen::MatrixXi faces) {
+  }
+  void recompute(void) {
+    std::cout << "RECOMPUTE!" << std::endl;
+    const int m = m_weights.cols();
+    m_constraints.resize(m*3,m*3*(3+1));
+    std::vector<Eigen::Triplet<double> > ijv;
+    for(int i=0; i<m; i++) {
+      Eigen::RowVector4d homo;
+      homo << m_vertices.row(m_handleIndicies(i)),1.;
+      for(int d=0; d<3; d++) {
+        for(int c=0; c<(3+1); c++) {
+          ijv.push_back(Eigen::Triplet<double>(3*i + d,i + c*m*3 + d*m, homo(c)));
+        }
+      }
+    }
+    m_constraints.setFromTriplets(ijv.begin(),ijv.end());
+    igl::arap_dof_recomputation(Eigen::VectorXi(), m_constraints, m_arap_dof_data);
+  }
   void tetrahedralize(
     Eigen::MatrixXd vertices, 
     Eigen::MatrixXi faces,
@@ -128,78 +160,17 @@ private:
     std::cout << "Tetrahedralize" << std::endl; 
     igl::copyleft::tetgen::tetrahedralize(vertices, faces, "Ypq100", tetVertices, tetFaces, tetBoundryFaces);
   }
-  void computeWeights(Eigen::MatrixXd vertices, Eigen::MatrixXi faces) {
-    /*
-    igl::BBWData bbw_data;
-    bbw_data.active_set_params.max_iter = 8;
-    bbw_data.verbosity = 2;
-    */ 
-    //if(!igl::bbw(vertices, faces
-  }  
-  igl::ArapDOFData<LbsMatrixType, LbsScalarType> m_arap_dof_data; 
+  Eigen::MatrixXd m_vertices; 
   Eigen::MatrixXd m_weights;
+  Eigen::VectorXi m_handleIndicies;
+  igl::ArapDOFData<LbsMatrixType, LbsScalarType> m_arap_dof_data;
+  Eigen::SparseMatrix<double> m_constraints;
 };
 
+// Export C++ class to JS
 EMSCRIPTEN_BINDINGS(shape) {
   emscripten::class_<Shape>("Shape")
     .constructor<const emscripten::val &, const emscripten::val &, const emscripten::val &, int>()
     .function("getWeights", &Shape::getWeights)
-    .function("recompute", &Shape::recompute)
     .function("update", &Shape::update);
 }
-
-/*
-      //for(int v=0; v<vertices.size(); v++) {
-      //  std::cout << vertices.at(v) << std::endl; 
-      //} 
-
-EMSCRIPTEN_KEEPALIVE
-int createShape() {
-  // Test Verts
-  const Eigen::MatrixXd vertices = (Eigen::MatrixXd(8,3)<<
-    0.0,0.0,0.0,
-    0.0,0.0,1.0,
-    0.0,1.0,0.0,
-    0.0,1.0,1.0,
-    1.0,0.0,0.0,
-    1.0,0.0,1.0,
-    1.0,1.0,0.0,
-    1.0,1.0,1.0).finished();
-
-  // Test Faces
-  const Eigen::MatrixXi faces = (Eigen::MatrixXi(12,3)<<
-    1,7,5,
-    1,3,7,
-    1,4,3,
-    1,2,4,
-    3,8,7,
-    3,4,8,
-    5,7,8,
-    5,8,6,
-    1,5,6,
-    1,6,2,
-    2,6,8,
-    2,8,4).finished().array()-1;
-
-  // Handles
-  LbsMatrixType handles;
- 
-  // Vertex Groups
-  Eigen::Matrix<int,Eigen::Dynamic,1> groups;
-
-  // Return data
-  igl::ArapDOFData<LbsMatrixType,SSCALAR> arap_dof;
-
-  // Precompute
-  //arap_dof_precomputation(vertices, faces, handles, groups, arap_dof);
-  std::cout << vertices << "\n\n"; 
-  std::cout << faces; 
-
-  return 10;
-}
-
-EMSCRIPTEN_KEEPALIVE
-int test() {
-  return 1;
-}
-*/
