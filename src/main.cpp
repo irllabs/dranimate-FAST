@@ -28,7 +28,7 @@ public:
     int dims) {
     // Convert vertices from js
     std::vector<double> vecVertices = emscripten::vecFromJSArray<double>(jsVertices);
-    m_vertices = 
+    Eigen::MatrixXd vertices = 
       Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(vecVertices.data(), vecVertices.size()/dims, dims);
 
     // Convert faces from js
@@ -44,14 +44,14 @@ public:
     // If 2D convert to 3D
     if(dims == 2) {
       // Increase vertex dimensions 
-      m_vertices.conservativeResize(m_vertices.rows(), 3);
-      m_vertices.col(2).setZero(); 
+      vertices.conservativeResize(vertices.rows(), 3);
+      vertices.col(2).setZero(); 
       // Increase handle dimensions
       handles.conservativeResize(handles.rows(), 3);
       handles.col(2).setZero(); 
     }
 
-    std::cout << "Vertices " << m_vertices.rows() << " [" << m_vertices << "]" << std::endl;
+    std::cout << "Vertices " << vertices.rows() << " [" << vertices << "]" << std::endl;
     std::cout << "Faces " << faces.rows() << " [" << faces << "]" << std::endl;
     std::cout << "Handles " << handles.rows() << " [" << handles << "]" << std::endl;
 
@@ -65,7 +65,7 @@ public:
     Eigen::VectorXi boundaryIndicies;
     Eigen::MatrixXd boundaryConditions;
     igl::boundary_conditions(
-      m_vertices, 
+      vertices, 
       faces, 
       handles, 
       pointHandleIndicies, 
@@ -81,7 +81,7 @@ public:
     bbw_data.active_set_params.max_iter = 16;
     bbw_data.verbosity = 2;
     igl::bbw(
-      m_vertices, 
+      vertices, 
       faces, 
       boundaryIndicies, 
       boundaryConditions, 
@@ -92,7 +92,7 @@ public:
 
     // Convert weights into FAST precompute format
     Eigen::MatrixXd weightsByHandle;
-    igl::lbs_matrix_column(m_vertices, m_weights, weightsByHandle);
+    igl::lbs_matrix_column(vertices, m_weights, weightsByHandle);
 
     // Create groups
     Eigen::VectorXi groups;
@@ -110,14 +110,14 @@ public:
 
     // FAST precompute
     igl::arap_dof_precomputation(
-      m_vertices,
+      vertices,
       faces,
       weightsByHandle,
       groups,
       m_arap_dof_data);
 
     // FAST initial recompute
-    recompute();
+    recompute(vertices);
   }
   void update(void) {
   }
@@ -132,25 +132,23 @@ public:
     return emscripten::val(emscripten::typed_memory_view(flatWeights.size(), flatWeights.data()));
   }
 private:
-  void computeWeights(Eigen::MatrixXd m_vertices, Eigen::MatrixXi faces) {
+  void computeWeights(Eigen::MatrixXd vertices, Eigen::MatrixXi faces) {
   }
-  void recompute(void) {
+  void recompute(Eigen::MatrixXd vertices) {
     std::cout << "RECOMPUTE!" << std::endl;
-    /*
     const int m = m_weights.cols();
     m_constraints.resize(m*3,m*3*(3+1));
     std::vector<Eigen::Triplet<double>> ijv;
     for(int i=0; i<m; i++) {
       Eigen::RowVector4d homo;
-      homo << m_vertices.row(m_handleIndicies(i)),1.;
+      homo << vertices.row(m_handleIndicies(i)),1.;
       for(int d=0; d<3; d++) {
         for(int c=0; c<(3+1); c++) {
           ijv.push_back(Eigen::Triplet<double>(3*i + d,i + c*m*3 + d*m, homo(c)));
         }
       }
     }
-    */
-    //m_constraints.setFromTriplets(ijv.begin(),ijv.end());
+    m_constraints.setFromTriplets(ijv.begin(),ijv.end());
     //igl::arap_dof_recomputation(Eigen::VectorXi(), m_constraints, m_arap_dof_data);
   }
   void tetrahedralize(
@@ -162,7 +160,6 @@ private:
     std::cout << "Tetrahedralize" << std::endl; 
     igl::copyleft::tetgen::tetrahedralize(vertices, faces, "Ypq100", tetVertices, tetFaces, tetBoundryFaces);
   }
-  Eigen::MatrixXd m_vertices; 
   Eigen::MatrixXd m_weights;
   Eigen::VectorXi m_handleIndicies;
   igl::ArapDOFData<LbsMatrixType, LbsScalarType> m_arap_dof_data;
