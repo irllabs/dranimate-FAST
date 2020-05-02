@@ -136,9 +136,10 @@ private:
   }
   void recompute(void) {
     std::cout << "RECOMPUTE!" << std::endl;
+    /*
     const int m = m_weights.cols();
     m_constraints.resize(m*3,m*3*(3+1));
-    std::vector<Eigen::Triplet<double> > ijv;
+    std::vector<Eigen::Triplet<double>> ijv;
     for(int i=0; i<m; i++) {
       Eigen::RowVector4d homo;
       homo << m_vertices.row(m_handleIndicies(i)),1.;
@@ -148,8 +149,9 @@ private:
         }
       }
     }
-    m_constraints.setFromTriplets(ijv.begin(),ijv.end());
-    igl::arap_dof_recomputation(Eigen::VectorXi(), m_constraints, m_arap_dof_data);
+    */
+    //m_constraints.setFromTriplets(ijv.begin(),ijv.end());
+    //igl::arap_dof_recomputation(Eigen::VectorXi(), m_constraints, m_arap_dof_data);
   }
   void tetrahedralize(
     Eigen::MatrixXd vertices, 
