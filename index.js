@@ -27,13 +27,13 @@ export class Shape {
   // [handles] Flat array of 2D or 3D handle coordinates
   // [dimensions] 2 or 3
   constructor(vertices, faces, handles, dimensions) {
-    console.log('---------------------------------');
+    console.log('-----------------------');
     console.log('Dranimate FAST ' + dimensions + 'D shape');
-    console.log('---------------------------------');
+    console.log('-----------------------');
     console.log(vertices.length / dimensions + ' vertices');
     console.log(faces.length / 3 + ' faces');
     console.log(handles.length / dimensions + ' handles');
-    console.log('---------------------------------');
+    console.log('-----------------------');
     this.cppShape = new cppModule.Shape(vertices, faces, handles, dimensions);
   }
   // Get Bounded Biharmonic computed skinning weights
@@ -42,8 +42,8 @@ export class Shape {
   }
   // Update FAST shape
   // Returns skinning matricies for frame
-  update() {
-    return this.cppShape.update();
+  update(handleTranslations) {
+    return this.cppShape.update(handleTranslations);
   }
   // C++ Shape instance
   cppShape; 
