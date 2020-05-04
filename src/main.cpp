@@ -92,7 +92,7 @@ public:
       boundaryConditions, 
       bbw_data, 
       m_weights); 
-    bbw_data.print();
+    //bbw_data.print();
     //std::cout << "Generated Weights [" << m_weights << "]" << std::endl;
 
     // Convert weights into FAST precompute format
@@ -113,11 +113,10 @@ public:
       igl::mat_max(m_weights, 1, maxWeight, m_handleIndicies);
     }
 
-    // FAST precompute
-
     //std::cout << "Weights per handle: " << weightsByHandle << std::endl;
     //std::cout << "groups: " << groups << std::endl;
-
+    
+    // FAST precompute
     igl::arap_dof_precomputation(
       m_vertices,
       faces,
@@ -126,7 +125,6 @@ public:
       m_arap_dof_data);
 
     // FAST initial recompute
-
     const int m = m_weights.cols();
     Eigen::SparseMatrix<double> constraints;
     constraints.resize(m*3,m*3*(3+1));
