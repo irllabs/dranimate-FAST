@@ -45,6 +45,4 @@ export class Shape {
   update(handleTranslations) {
     return this.cppShape.update(handleTranslations);
   }
-  // C++ Shape instance
-  cppShape; 
 }
