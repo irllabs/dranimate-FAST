@@ -26,23 +26,37 @@ export class Shape {
   // [faces] Flat array of face indicies
   // [handles] Flat array of 2D or 3D handle coordinates
   // [dimensions] 2 or 3
-  constructor(vertices, faces, handles, dimensions) {
+  constructor(vertices, faces, dimensions) {
     console.log('-----------------------');
     console.log('Dranimate FAST ' + dimensions + 'D shape');
     console.log('-----------------------');
     console.log(vertices.length / dimensions + ' vertices');
     console.log(faces.length / 3 + ' faces');
-    console.log(handles.length / dimensions + ' handles');
     console.log('-----------------------');
-    this.cppShape = new cppModule.Shape(vertices, faces, handles, dimensions);
+    this.cppShape = new cppModule.Shape(vertices, faces, dimensions);
+  }
+	// Add control point to shape
+	addControlPoint() {
+		console.log('SHAPE: addControlPoint');
+    this.cppShape.addControlPoint();
+	}
+	// Set control point position
+	setControlPointPosition(cp, x, y) {
+		console.log('SHAPE: setControlPointPosition', cp, x, y);
+    this.cppShape.setControlPointPosition(cp, x, y);
+	}
+	// Precompute Fast ARAP DOF
+	precompute() {
+		console.log('SHAPE: precompute');
+    this.cppShape.precompute();
+	}
+  // Update FAST shape
+  // Returns skinned vertices for frame
+  update() {
+    return this.cppShape.update();
   }
   // Get Bounded Biharmonic computed skinning weights
   getWeights() {
     return this.cppShape.getWeights();
-  }
-  // Update FAST shape
-  // Returns skinning matricies for frame
-  update(handleTranslations) {
-    return this.cppShape.update(handleTranslations);
   }
 }
