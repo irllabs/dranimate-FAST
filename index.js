@@ -35,19 +35,19 @@ export class Shape {
     console.log('-----------------------');
     this.cppShape = new cppModule.Shape(vertices, faces, dimensions);
   }
-	// Add control point to shape
-	addControlPoint() {
-		console.log('SHAPE: addControlPoint');
-    this.cppShape.addControlPoint();
+	// Add control point at specific vertex
+	addControlPoint(vertexIndex) {
+		//console.log('SHAPE: addControlPoint');
+    this.cppShape.addControlPoint(vertexIndex);
 	}
 	// Set control point position
-	setControlPointPosition(cp, x, y) {
-		console.log('SHAPE: setControlPointPosition', cp, x, y);
-    this.cppShape.setControlPointPosition(cp, x, y);
+	setControlPointPosition(controlPointIndex, x, y) {
+		//console.log('SHAPE: setControlPointPosition', controlPointIndex, x, y);
+    this.cppShape.setControlPointPosition(controlPointIndex, x, y);
 	}
 	// Precompute Fast ARAP DOF
 	precompute() {
-		console.log('SHAPE: precompute');
+		//console.log('SHAPE: precompute');
     this.cppShape.precompute();
 	}
   // Update FAST shape

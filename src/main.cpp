@@ -31,15 +31,18 @@ public:
     m_faces = 
       Eigen::Map<Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(vecFaces.data(), vecFaces.size()/3,3);
   }
-  void addControlPoint() {
-    std::cout << "Add control point" << std::endl;
+  void addControlPoint(int vertexIndex) {
+    //std::cout << "Add control point: " << vertexIndex << std::endl;
+		int size = m_controlPointIndicies.size();
+		m_controlPointIndicies.conservativeResize(size+1);
+		m_controlPointIndicies(size) = vertexIndex;
     m_controlPointsFlat.push_back(0.0);
     m_controlPointsFlat.push_back(0.0);
   }
-  void setControlPointPosition(int index, double x, double y) {
-    std::cout << "Set control point " << index << " position: (" << x << "," << y << ")" << std::endl;
-    m_controlPointsFlat[index*2+0] = x;
-    m_controlPointsFlat[index*2+1] = y;
+  void setControlPointPosition(int controlPointIndex, double x, double y) {
+    //std::cout << "Set control point " << controlPointIndex << " position: (" << x << "," << y << ")" << std::endl;
+    m_controlPointsFlat[controlPointIndex*2+0] = x;
+    m_controlPointsFlat[controlPointIndex*2+1] = y;
   }
   void precompute() {
     m_controlPoints = 
@@ -56,9 +59,9 @@ public:
       m_controlPoints.col(2).setZero(); 
     }
 
-    std::cout << "Vertices " << m_vertices.rows() << " [" << m_vertices << "]" << std::endl;
+   	//std::cout << "Vertices " << m_vertices.rows() << " [" << m_vertices << "]" << std::endl;
     //std::cout << "Faces " << m_faces.rows() << " [" << m_faces << "]" << std::endl;
-    //std::cout << "Control Points " << m_controlPoints.rows() << " [" << m_controlPoints << "]" << std::endl;
+    //std::cout << "Control Points " << " [" << m_controlPoints << "]" << std::endl;
 
     m_transformedVertices = m_vertices;
 
@@ -98,7 +101,7 @@ public:
       m_weights); 
     //bbw_data.print();
 
-    std::cout << "Generated Weights [" << m_weights << "]" << std::endl;
+    //std::cout << "Generated Weights [" << m_weights << "]" << std::endl;
 
 		// If we dont do this lbs_matrix_column leaves us with uninitialized (NaN) values
 		int dim = m_vertices.cols();
@@ -110,7 +113,7 @@ public:
     // Create linear blend skinning matrix from vertices and weights
     igl::lbs_matrix_column(m_vertices, m_weights, m_lbsMatrix);
 
-		std::cout << "LBS: " << m_lbsMatrix << std::endl;
+		//std::cout << "LBS: " << m_lbsMatrix << std::endl;
  
     // Create groups
     Eigen::VectorXi groups;
@@ -120,11 +123,7 @@ public:
       igl::partition(m_weights, 50, groups, S, D);
     }
 
-    // Find indicies of handle vertices
-    {
-      Eigen::VectorXd maxWeight;
-      igl::mat_max(m_weights, 1, maxWeight, m_handleIndicies);
-    }
+		//std::cout << "Control Point Indicies" << m_controlPointIndicies << std::endl;
 
     //std::cout << "LBS: " << m_lbsMatrix << std::endl;
     //std::cout << "groups: " << groups << std::endl;
@@ -144,7 +143,7 @@ public:
     std::vector<Eigen::Triplet<double>> ijv;
     for(int i=0; i<m; i++) {
       Eigen::RowVector4d homo;
-      homo << m_vertices.row(m_handleIndicies(i)),1.;
+      homo << m_vertices.row(m_controlPointIndicies(i)),1.;
       for(int d=0; d<3; d++) {
         for(int c=0; c<(3+1); c++) {
           ijv.push_back(Eigen::Triplet<double>(3*i + d,i + c*m*3 + d*m, homo(c)));
@@ -158,9 +157,9 @@ public:
     igl::columnize(Istack, m, 2, m_handleTransforms);
   }
   emscripten::val update() {
-    Eigen::MatrixXd bcp(m_handleIndicies.size(),m_vertices.cols());
-    Eigen::VectorXd Beq(3*m_handleIndicies.size());
-    for(int i = 0;i<m_handleIndicies.size();i++) {
+    Eigen::MatrixXd bcp(m_controlPointIndicies.size(),m_vertices.cols());
+    Eigen::VectorXd Beq(3*m_controlPointIndicies.size());
+    for(int i = 0;i<m_controlPointIndicies.size();i++) {
       bcp(i,0) = m_controlPointsFlat[i*2+0];
       bcp(i,1) = m_controlPointsFlat[i*2+1];
       bcp(i,2) = 0.0; 
@@ -220,7 +219,7 @@ public:
   }
 private:
   Eigen::MatrixXd m_weights;
-  Eigen::VectorXi m_handleIndicies;
+  Eigen::VectorXi m_controlPointIndicies;
   igl::ArapDOFData<LbsMatrixType, LbsScalarType> m_arap_dof_data;
   Eigen::MatrixXd m_handleTransforms;
   Eigen::MatrixXd m_vertices;
