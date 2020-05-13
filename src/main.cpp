@@ -21,6 +21,7 @@ class Shape {
 public:
   // CTOR
   Shape(const emscripten::val &jsVertices, const emscripten::val &jsFaces, int dims) {
+		// Store dims
     m_dims = dims;
     // Convert vertices from js
     std::vector<double> vecVertices = emscripten::vecFromJSArray<double>(jsVertices);
@@ -99,8 +100,8 @@ public:
       boundaryConditions, 
       bbw_data, 
       m_weights); 
-    //bbw_data.print();
 
+    //bbw_data.print();
     //std::cout << "Generated Weights [" << m_weights << "]" << std::endl;
 
 		// If we dont do this lbs_matrix_column leaves us with uninitialized (NaN) values
@@ -123,7 +124,7 @@ public:
       igl::partition(m_weights, 50, groups, S, D);
     }
 
-		//std::cout << "Control Point Indicies" << m_controlPointIndicies << std::endl;
+		//std::cout << "Control Point Indicies: " << m_controlPointIndicies << std::endl;
 
     //std::cout << "LBS: " << m_lbsMatrix << std::endl;
     //std::cout << "groups: " << groups << std::endl;
@@ -158,18 +159,21 @@ public:
   }
   emscripten::val update() {
     Eigen::MatrixXd bcp(m_controlPointIndicies.size(),m_vertices.cols());
-    Eigen::VectorXd Beq(3*m_controlPointIndicies.size());
+    Eigen::VectorXd beq(3*m_controlPointIndicies.size());
     for(int i = 0;i<m_controlPointIndicies.size();i++) {
       bcp(i,0) = m_controlPointsFlat[i*2+0];
       bcp(i,1) = m_controlPointsFlat[i*2+1];
       bcp(i,2) = 0.0; 
-      Beq(3*i+0) = bcp(i,0);
-      Beq(3*i+1) = bcp(i,1);
-      Beq(3*i+2) = bcp(i,2);
+      beq(3*i+0) = bcp(i,0);
+      beq(3*i+1) = bcp(i,1);
+      beq(3*i+2) = bcp(i,2);
     }
     Eigen::MatrixXd L0 = m_handleTransforms;
 
-    igl::arap_dof_update(m_arap_dof_data, Beq, L0, 30, 0, m_handleTransforms);
+		//std::cout << "BCP " << bcp << std::endl; 
+		//std::cout << "BEQ " << beq << std::endl; 
+
+    igl::arap_dof_update(m_arap_dof_data, beq, L0, 30, 0, m_handleTransforms);
 
     const auto & Ucol = m_lbsMatrix * m_handleTransforms;
 
@@ -191,14 +195,6 @@ public:
       if(x != x) x = 0.0;
       if(y != y) y = 0.0;
       if(z != z) z = 0.0;
- 
-      /*
-      if(tv<20) {
-        std::cout << "PUSHING X " << x << std::endl;
-        std::cout << "PUSHING Y " << y << std::endl;
-        std::cout << "PUSHING Z " << z << std::endl;
-      }
-      */
 
       m_flatTransformedVertices.push_back(x);
       m_flatTransformedVertices.push_back(y);
