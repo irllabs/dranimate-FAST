@@ -121,7 +121,7 @@ public:
     {
       Eigen::VectorXi S;
       Eigen::VectorXd D;
-      igl::partition(m_weights, 50, groups, S, D);
+      igl::partition(m_weights, 4, groups, S, D);
     }
 
 		//std::cout << "Control Point Indicies: " << m_controlPointIndicies << std::endl;
@@ -144,6 +144,7 @@ public:
     std::vector<Eigen::Triplet<double>> ijv;
     for(int i=0; i<m; i++) {
       Eigen::RowVector4d homo;
+			//std::cout << "CP RECOMPUTE: " << m_vertices.row(m_controlPointIndicies(i)) << std::endl;
       homo << m_vertices.row(m_controlPointIndicies(i)),1.;
       for(int d=0; d<3; d++) {
         for(int c=0; c<(3+1); c++) {
@@ -152,10 +153,12 @@ public:
       }
     }
     constraints.setFromTriplets(ijv.begin(),ijv.end());
+		//std::cout << "CONSTRAINTS SPARSE: " << constraints << std::endl;
     igl::arap_dof_recomputation(Eigen::VectorXi(), constraints, m_arap_dof_data);
 
     Eigen::MatrixXd Istack = Eigen::MatrixXd::Identity(3, 3+1).replicate(1, m);
     igl::columnize(Istack, m, 2, m_handleTransforms);
+		//std::cout << "HANDLE TRANSFORMS: " << m_handleTransforms << std::endl;
   }
   emscripten::val update() {
     Eigen::MatrixXd bcp(m_controlPointIndicies.size(),m_vertices.cols());
